@@ -1,53 +1,53 @@
 use std.runtime;
 
-use A: std.allocator;
-use O: std.types.option;
-use R: std.types.result;
-
-use page:   std.allocator.page;
-use mem:    std.memory;
-use time:   std.chrono.time;
-use parse:  std.text.parse;
-use vec:    std.collections.vector;
-
-use std.print.printf;
-use std.types.bool.bool;
-use std.types.bool.true;
-use std.types.bool.false;
-use std.types.string.str;
-use std.types.size.usize;
+use std.allocator;
+use std.allocator.page;
 use std.chrono.duration.Duration;
 use std.chrono.duration.duration_msec;
+use std.chrono.time;
+use std.collections.vector;
+use std.collections.vector.Vector;
+use std.memory;
+use std.print.printf;
+use std.text.parse;
+use std.types.bool.bool;
+use std.types.bool.false;
+use std.types.bool.true;
+use std.types.error.err;
+use std.types.result.res;
+use std.types.size.usize;
+use std.types.string.str;
 
-# sieve: mark every prime index below limit in primes.
-# ---
-# limit: exclusive upper bound (must be >= 2)
-# primes: buffer of at least count booleans; primes[i] is true iff i is prime
-# count: length of the primes buffer
-# ret: an error message when the inputs are invalid, none otherwise
-fun sieve(limit: u64, primes: *bool, count: usize) O.Option[str] {
+tag SieveError: u8 {
+    limit_too_small;
+    null_buffer;
+    buffer_too_small;
+}
+
+# mark prime indices below limit in the primes buffer
+fun sieve(limit: u64, primes: *bool, count: usize) err[SieveError] {
     if (limit < 2) {
-        ret O.some[str]("limit must be at least 2");
+        ret err[SieveError].err{SieveError.limit_too_small{}};
     }
 
     if (primes == nil) {
-        ret O.some[str]("provided buffer has null data pointer");
+        ret err[SieveError].err{SieveError.null_buffer{}};
     }
 
     if (count < limit::usize) {
-        ret O.some[str]("provided buffer is smaller than required");
+        ret err[SieveError].err{SieveError.buffer_too_small{}};
     }
 
-    # initialize: assume all are prime
-    mem.fill[bool](primes, true, count);
+    # assume all numbers are prime initially
+    memory.fill[bool](primes, true, count);
     primes[0] = false;
     primes[1] = false;
 
-    # mark even numbers > 2
+    # mark even numbers above two
     var i: u64 = 4;
     for (i < limit) {
         primes[i::usize] = false;
-        i = i + 2;
+        i                = i + 2;
     }
 
     # sieve odd composites
@@ -57,13 +57,13 @@ fun sieve(limit: u64, primes: *bool, count: usize) O.Option[str] {
             var j: u64 = p * p;
             for (j < limit) {
                 primes[j::usize] = false;
-                j = j + p;
+                j                = j + p;
             }
         }
         p = p + 2;
     }
 
-    ret O.none[str]();
+    ret err[SieveError].ok{};
 }
 
 #[symbol("main")]
@@ -72,12 +72,23 @@ fun main(argc: i64, argv: **u8) i64 {
     printf("usage: {} [limit] (default: {})\n", argv[0], limit);
 
     if (argc > 1) {
-        val r: R.Result[u64, str] = parse.parse_u64(argv[1], 10);
-        if (R.is_err[u64, str](r)) {
-            printf("error: invalid limit: {}\n", R.unwrap_err[u64, str](r));
+        val r: res[u64, parse.ParseError] = parse.parse_u64(argv[1], 10);
+        if (sel r.err) {
+            if (sel r.err.empty) {
+                printf("error: invalid limit: empty input\n");
+            }
+            if (sel r.err.syntax) {
+                printf("error: invalid limit: invalid syntax\n");
+            }
+            if (sel r.err.overflow) {
+                printf("error: invalid limit: number overflow\n");
+            }
+            if (sel r.err.base) {
+                printf("error: invalid limit: invalid base\n");
+            }
             ret 1;
         }
-        limit = R.unwrap_ok[u64, str](r);
+        limit = r.ok;
     }
 
     printf("finding primes up to {}\n", limit);
@@ -89,44 +100,63 @@ fun main(argc: i64, argv: **u8) i64 {
     }
 
     # initialize a page-backed allocator
-    var a: A.Allocator;
-    val opt_make: O.Option[str] = page.make(?a);
-    if (O.is_some[str](opt_make)) {
-        printf("error: {}\n", O.unwrap[str](opt_make));
+    var a:        allocator.Allocator;
+    val opt_make: err[allocator.Error] = page.make(?a);
+    if (sel opt_make.err) {
+        printf("error: failed to initialize page allocator\n");
         ret 1;
     }
 
     # allocate memory for the sieve
-    val r_alloc: R.Result[*bool, str] = A.allocate[bool](?a, count);
-    if (R.is_err[*bool, str](r_alloc)) {
-        printf("error: {}\n", R.unwrap_err[*bool, str](r_alloc));
+    val r_alloc: res[*bool, allocator.Error] = allocator.allocate[bool](?a, count);
+    if (sel r_alloc.err) {
+        printf("error: failed to allocate sieve buffer\n");
         ret 1;
     }
 
-    val primes: *bool = R.unwrap_ok[*bool, str](r_alloc);
+    val primes: *bool = r_alloc.ok;
 
     # run the sieve
-    val start:   time.Time     = time.now();
-    val opt_err: O.Option[str]   = sieve(limit, primes, count);
-    val elapsed: Duration  = time.since(start);
+    val start_res: time.Clock = time.now();
+    if (sel start_res.err) {
+        printf("error: failed to read start time\n");
+        ret 1;
+    }
+    val start: time.Time = start_res.ok;
 
-    if (O.is_some[str](opt_err)) {
-        printf("error: {}\n", O.unwrap[str](opt_err));
+    val opt_err: err[SieveError] = sieve(limit, primes, count);
+    if (sel opt_err.err) {
+        if (sel opt_err.err.limit_too_small) {
+            printf("error: limit must be at least 2\n");
+        }
+        if (sel opt_err.err.null_buffer) {
+            printf("error: provided buffer has null data pointer\n");
+        }
+        if (sel opt_err.err.buffer_too_small) {
+            printf("error: provided buffer is smaller than required\n");
+        }
         ret 1;
     }
 
+    val el_res: time.Elapsed = time.since(start);
+    if (sel el_res.err) {
+        printf("error: failed to read elapsed time\n");
+        ret 1;
+    }
+    val elapsed: Duration = el_res.ok;
+
     # collect prime indices
-    var indices: vec.Vector[u64] = vec.init[u64](?a);
-    var i: u64 = 0;
-    for (i < limit) {
-        if (primes[i::usize]) {
-            val r_push: R.Result[usize, str] = vec.push[u64](?indices, i);
-            if (R.is_err[usize, str](r_push)) {
-                printf("error: {}\n", R.unwrap_err[usize, str](r_push));
+    var indices: Vector[u64] = vector.init[u64](?a);
+    var idx:     u64         = 0;
+    for (idx < limit) {
+        if (primes[idx::usize]) {
+            val r_push: res[usize, allocator.Error] = vector.push[u64](?indices, idx);
+            if (sel r_push.err) {
+                printf("error: failed to push prime index\n");
                 ret 1;
             }
         }
-        i = i + 1;
+        idx = idx + 1;
     }
 
     printf("found:       {}\n", indices.len);
@@ -138,8 +168,61 @@ fun main(argc: i64, argv: **u8) i64 {
     }
 
     # cleanup
-    vec.dnit[u64](?indices);
-    A.deallocate[bool](?a, primes, count);
+    vector.dnit[u64](?indices);
+    allocator.deallocate[bool](?a, primes, count);
 
+    ret 0;
+}
+
+test "sieve: basic prime generation" {
+    var a:        allocator.Allocator;
+    val opt_make: err[allocator.Error] = page.make(?a);
+    if (sel opt_make.err) { ret 1; }
+
+    val limit:   u64                         = 10;
+    val count:   usize                       = limit::usize;
+    val r_alloc: res[*bool, allocator.Error] = allocator.allocate[bool](?a, count);
+    if (sel r_alloc.err) { ret 2; }
+    val primes: *bool = r_alloc.ok;
+
+    val opt_err: err[SieveError] = sieve(limit, primes, count);
+    if (sel opt_err.err) { ret 3; }
+
+    if (primes[0] || primes[1])                               { ret 4; }
+    if (!primes[2] || !primes[3] || !primes[5] || !primes[7]) { ret 5; }
+    if (primes[4] || primes[6] || primes[8] || primes[9])     { ret 6; }
+
+    allocator.deallocate[bool](?a, primes, count);
+    ret 0;
+}
+
+test "sieve: invalid limit returns error" {
+    val opt_err: err[SieveError] = sieve(1, nil, 0);
+    if (sel opt_err.ok)                   { ret 1; }
+    if (!sel opt_err.err.limit_too_small) { ret 2; }
+    ret 0;
+}
+
+test "sieve: nil primes buffer returns error" {
+    val opt_err: err[SieveError] = sieve(10, nil, 10);
+    if (sel opt_err.ok)               { ret 1; }
+    if (!sel opt_err.err.null_buffer) { ret 2; }
+    ret 0;
+}
+
+test "sieve: small buffer returns error" {
+    var a:        allocator.Allocator;
+    val opt_make: err[allocator.Error] = page.make(?a);
+    if (sel opt_make.err) { ret 1; }
+
+    val r_alloc: res[*bool, allocator.Error] = allocator.allocate[bool](?a, 5);
+    if (sel r_alloc.err) { ret 2; }
+    val primes: *bool = r_alloc.ok;
+
+    val opt_err: err[SieveError] = sieve(10, primes, 5);
+    allocator.deallocate[bool](?a, primes, 5);
+
+    if (sel opt_err.ok)                    { ret 3; }
+    if (!sel opt_err.err.buffer_too_small) { ret 4; }
     ret 0;
 }

@@ -1,21 +1,38 @@
 [project]
 id      = "sieve"
-name    = "Mach Sieve"
 version = "0.4.1"
 src     = "src"
-dep     = "dep"
-target  = "native"
-out     = "out/{target}/bin/{name}{ext}"
-obj     = "out/{target}/obj"
+out     = "out/{target.name}/{profile.name}"
 
-[target.linux]
-isa = "x86_64"
-os  = "linux"
-abi = "sysv64"
+[target.linux-x86_64]
+default = true
+isa     = "x86_64"
+os      = "linux"
+abi     = "sysv64"
 
-[bin.sieve]
-entry = "main.mach"
+[profile.debug]
+default       = true
+opt           = 0
+debug         = true
+simd          = "scalarize"
+vectorize     = false
+float_reassoc = false
 
-[deps.mach-std]
+[profile.release]
+opt           = 2
+debug         = false
+simd          = "scalarize"
+vectorize     = true
+float_reassoc = false
+
+[artifact.sieve]
+kind    = "bin"
+entry   = "main.mach"
+out     = "bin/sieve{artifact.suffix}"
+targets = ["*"]
+link    = []
+need    = []
+
+[dep.std]
 git = "https://github.com/briar-systems/mach-std"
-ref = "branch/main"
+ref = "tag/v2.0.0"

@@ -20,7 +20,7 @@ cd mach-sieve
 Fetch the standard library dependency:
 
 ```bash
-mach dep pull
+mach dep pull .
 ```
 
 Build the project:
@@ -29,7 +29,7 @@ Build the project:
 mach build .
 ```
 
-This compiles the source files and places the resulting binary in `out/linux/bin/sieve`.
+This compiles the source files and places the resulting binary in `out/linux-x86_64/debug/bin/sieve`.
 
 You can also build and run in one step. Arguments after `--` are forwarded to the program:
 

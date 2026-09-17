@@ -13,7 +13,7 @@ You need the `mach` compiler. Install the latest [release](https://github.com/br
 Clone the repository:
 
 ```bash
-git clone https://github.com/octalide/mach-sieve
+git clone https://github.com/briar-systems/mach-sieve
 cd mach-sieve
 ```
 

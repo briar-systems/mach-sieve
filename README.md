@@ -8,7 +8,7 @@ This project demonstrates the intended structure of a Mach project, including th
 
 # Building
 
-You need the `mach` compiler. Install the latest [release](https://github.com/briar-systems/mach/releases) and ensure it is on your `PATH`.
+You need the `mach` compiler, 6.3 or a later 6.x release. Install the latest [release](https://github.com/briar-systems/mach/releases) and ensure it is on your `PATH`.
 
 Clone the repository:
 
@@ -29,11 +29,17 @@ Build the project:
 mach build .
 ```
 
-This compiles the source files and places the resulting binary in `out/linux-x86_64/debug/bin/sieve`.
+This compiles the `sieve` artifact from its entry, `src/bin/sieve.mach`, and places the resulting binary in `out/linux-x86_64/debug/bin/sieve`.
 
 You can also build and run in one step. Arguments after `--` are forwarded to the program:
 
 ```bash
 mach run .          # sieve up to the default limit
 mach run . -- 1000  # sieve up to 1000
+```
+
+Run the tests, bounding each one:
+
+```bash
+mach test . --timeout 1m
 ```

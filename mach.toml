@@ -28,7 +28,7 @@ float_reassoc = false
 
 [artifact.sieve]
 kind    = "bin"
-entry   = "main.mach"
+entry   = "bin/sieve.mach"
 out     = "bin/sieve{artifact.suffix}"
 targets = ["*"]
 link    = []

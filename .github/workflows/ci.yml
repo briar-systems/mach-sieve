@@ -27,6 +27,8 @@ jobs:
       skip-legs: '["aarch64-linux", "x86_64-windows", "aarch64-darwin", "x86_64-darwin"]'
       profiles: '["debug", "release"]'
       submodules: "false"
+      # the family pin is still v5.10.0, so this seeds the mach the manifest requires
+      mach-version: v6.3.0
 
   gate:
     if: always()

@@ -16,7 +16,6 @@ use std.types.bool.true;
 use std.types.error.err;
 use std.types.result.res;
 use std.types.size.usize;
-use std.types.string.str;
 
 tag SieveError: u8 {
     limit_too_small;
@@ -174,55 +173,29 @@ fun main(argc: i64, argv: **u8) i64 {
     ret 0;
 }
 
-test "sieve: basic prime generation" {
-    var a:        allocator.Allocator;
-    val opt_make: err[allocator.Error] = page.make(?a);
-    if (sel opt_make.err) { ret 1; }
+test sieve__marks_primes_below_limit {
+    var primes:  [10]bool;
+    val opt_err: err[SieveError] = sieve(10, ?primes[0], 10);
+    if (sel opt_err.err) { ret 1; }
 
-    val limit:   u64                         = 10;
-    val count:   usize                       = limit::usize;
-    val r_alloc: res[*bool, allocator.Error] = allocator.allocate[bool](?a, count);
-    if (sel r_alloc.err) { ret 2; }
-    val primes: *bool = r_alloc.ok;
-
-    val opt_err: err[SieveError] = sieve(limit, primes, count);
-    if (sel opt_err.err) { ret 3; }
-
-    if (primes[0] || primes[1])                               { ret 4; }
-    if (!primes[2] || !primes[3] || !primes[5] || !primes[7]) { ret 5; }
-    if (primes[4] || primes[6] || primes[8] || primes[9])     { ret 6; }
-
-    allocator.deallocate[bool](?a, primes, count);
+    if (primes[0] || primes[1])                               { ret 2; }
+    if (!primes[2] || !primes[3] || !primes[5] || !primes[7]) { ret 3; }
+    if (primes[4] || primes[6] || primes[8] || primes[9])     { ret 4; }
     ret 0;
 }
 
-test "sieve: invalid limit returns error" {
-    val opt_err: err[SieveError] = sieve(1, nil, 0);
-    if (sel opt_err.ok)                   { ret 1; }
-    if (!sel opt_err.err.limit_too_small) { ret 2; }
-    ret 0;
-}
+test sieve__rejects_invalid_arguments {
+    val small_limit: err[SieveError] = sieve(1, nil, 0);
+    if (!sel small_limit.err)                 { ret 1; }
+    if (!sel small_limit.err.limit_too_small) { ret 2; }
 
-test "sieve: nil primes buffer returns error" {
-    val opt_err: err[SieveError] = sieve(10, nil, 10);
-    if (sel opt_err.ok)               { ret 1; }
-    if (!sel opt_err.err.null_buffer) { ret 2; }
-    ret 0;
-}
+    val no_buffer: err[SieveError] = sieve(10, nil, 10);
+    if (!sel no_buffer.err)             { ret 3; }
+    if (!sel no_buffer.err.null_buffer) { ret 4; }
 
-test "sieve: small buffer returns error" {
-    var a:        allocator.Allocator;
-    val opt_make: err[allocator.Error] = page.make(?a);
-    if (sel opt_make.err) { ret 1; }
-
-    val r_alloc: res[*bool, allocator.Error] = allocator.allocate[bool](?a, 5);
-    if (sel r_alloc.err) { ret 2; }
-    val primes: *bool = r_alloc.ok;
-
-    val opt_err: err[SieveError] = sieve(10, primes, 5);
-    allocator.deallocate[bool](?a, primes, 5);
-
-    if (sel opt_err.ok)                    { ret 3; }
-    if (!sel opt_err.err.buffer_too_small) { ret 4; }
+    var short:        [5]bool;
+    val short_buffer: err[SieveError] = sieve(10, ?short[0], 5);
+    if (!sel short_buffer.err)                  { ret 5; }
+    if (!sel short_buffer.err.buffer_too_small) { ret 6; }
     ret 0;
 }

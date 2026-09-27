@@ -1,7 +1,7 @@
 [project]
 id      = "sieve"
 version = "0.4.1"
-mach    = "^5.3"
+mach    = "^6.3"
 src     = "src"
 out     = "out/{target.name}/{profile.name}"
 
@@ -28,12 +28,12 @@ float_reassoc = false
 
 [artifact.sieve]
 kind    = "bin"
-entry   = "main.mach"
+entry   = "bin/sieve.mach"
 out     = "bin/sieve{artifact.suffix}"
 targets = ["*"]
 link    = []
 need    = []
 
 [dep.std]
-git = "https://github.com/briar-systems/mach-std"
-ref = "tag/v2.0.0"
+git     = "https://github.com/briar-systems/mach-std"
+version = "^9.0"
